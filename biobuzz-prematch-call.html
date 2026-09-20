@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>BIOBUZZ build call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#ECEAE4; --panel:#F7F6F2; --ink:#1B1F1C; --mute:#5E635F; --line:#CFCCC4;
+  --pollen:#E8A800; --hive:#2F7A46; --flower:#8A4FBF; --red:#C63A2F; --blue:#2E5BCB;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1C1E1D; --panel:#262927; --ink:#EDEBE5; --mute:#A3A79F; --line:#3E423F;
+    --pollen:#F2B705; --hive:#5BB273; --flower:#B07FE0; --red:#E05A4F; --blue:#6A8CE8;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1C1E1D; --panel:#262927; --ink:#EDEBE5; --mute:#A3A79F; --line:#3E423F;
+  --pollen:#F2B705; --hive:#5BB273; --flower:#B07FE0; --red:#E05A4F; --blue:#6A8CE8;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+main{max-width:1500px;margin:0 auto;padding:0 16px 4rem}
+main > header{padding:1rem 0 .5rem}
+.results,.inputs,.call{min-width:0}
+
+/* landscape tablets and up: results scroll on the left, inputs stay put on the right */
+@media (min-width:1000px){
+  main{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);grid-template-areas:"head head" "bar side" "call side" "res side";column-gap:2.5rem;padding:0 2rem 4rem}
+  main > header{grid-area:head}
+  .bar{grid-area:bar}
+  .call{grid-area:call}
+  .results{grid-area:res}
+  .inputs{grid-area:side;position:sticky;top:0;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;align-self:start;padding:.5rem .5rem 2rem 0}
+  .inputs .twocol{grid-template-columns:1fr}
+  .chartwrap{height:340px}
+}
+@media (max-height:520px){ .chartwrap{height:210px} }
+
+h1,h2,h3{font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif;font-weight:700;margin:0}
+h1{font-size:1.6rem;line-height:1.1}
+h2{font-size:1.35rem;margin:2rem 0 .6rem;padding-top:.5rem;border-top:2px solid var(--ink)}
+.results > h2:first-child{margin-top:1.4rem}
+p{margin:.4rem 0}
+.mute{color:var(--mute)}
+small{font-size:.85rem}
+.warn{color:var(--red)}
+.good{color:var(--hive)}
+
+/* always-visible one-line verdict */
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:baseline;justify-content:space-between;gap:1rem;padding:.45rem .75rem;background:var(--panel);border:2px solid var(--ink);margin:.25rem 0 0;font-family:"Barlow Condensed",Arial,sans-serif;font-size:1.15rem;font-weight:700;line-height:1.2}
+.bar span{font-family:"Instrument Sans",sans-serif;font-weight:500;font-size:.9rem;color:var(--mute);white-space:nowrap}
+
+.call{margin-top:.75rem;background:var(--panel);border:2px solid var(--ink);padding:1rem}
+.call .kicker{font-size:.9rem;color:var(--mute)}
+.call .verdict{font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;font-size:2.2rem;line-height:1.05;margin:.25rem 0}
+.call .because{font-size:.95rem}
+.call .eq{margin-top:.7rem;padding:.6rem .75rem;border-left:4px solid var(--pollen);background:var(--bg);font-size:.95rem}
+
+.versus{display:grid;grid-template-columns:1fr auto 1fr;gap:.75rem;align-items:center;margin:1rem 0 .3rem}
+.vs{font-family:"Barlow Condensed",Arial,sans-serif;font-size:1rem;color:var(--mute)}
+.card{border:1px solid var(--line);padding:.6rem .7rem;background:var(--bg)}
+.card .n{font-family:"Barlow Condensed",Arial,sans-serif;font-size:2.1rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.card .t{font-size:.85rem;color:var(--mute);line-height:1.25}
+.card.win{border-color:var(--hive);border-width:2px}
+.card.win .n{color:var(--hive)}
+
+.tl{margin:.6rem 0 0}
+.tl .lab{font-size:.78rem;color:var(--mute);margin:.5rem 0 .15rem}
+.tl .track{display:flex;height:34px;border:1px solid var(--line);overflow:hidden;font-size:.72rem}
+.tl .seg{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;font-weight:600}
+.tl .ticks{display:flex;justify-content:space-between;font-size:.72rem;color:var(--mute);margin-top:.15rem;font-variant-numeric:tabular-nums}
+.sg-auto{background:var(--mute)}
+.sg-shoot{background:var(--hive)}
+.sg-flower{background:var(--flower)}
+.sg-park{background:var(--pollen);color:#1B1F1C}
+.sg-dead{background:var(--line);color:var(--mute)}
+
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.cmp{width:100%;min-width:520px;border-collapse:collapse;margin-top:.6rem;font-variant-numeric:tabular-nums}
+table.cmp th{text-align:right;font-weight:500;color:var(--mute);font-size:.78rem;padding:.25rem .3rem;border-bottom:1px solid var(--line)}
+table.cmp th:first-child,table.cmp th.l{text-align:left}
+table.cmp td{padding:.5rem .3rem;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+table.cmp td:first-child,table.cmp td.l{text-align:left}
+table.cmp td.n{font-family:"Barlow Condensed",Arial,sans-serif;font-size:1.3rem;font-weight:700}
+table.cmp tr.best td:first-child::before{content:"\25B6 ";color:var(--pollen)}
+table.cmp tr.best{background:var(--panel)}
+.sublabel{display:block;font-size:.78rem;color:var(--mute);font-family:"Instrument Sans",sans-serif;font-weight:400}
+
+.chartwrap{position:relative;height:250px;margin:.6rem 0 .3rem}
+.chartsel{font:inherit;padding:.25rem .4rem;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:0}
+
+.inputs h2{margin-top:1rem}
+details{border-top:1px solid var(--line)}
+details > summary{cursor:pointer;font-weight:600;padding:.7rem 0;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details > summary::-webkit-details-marker{display:none}
+details > summary::after{content:"+";font-family:"Barlow Condensed",Arial,sans-serif;font-size:1.5rem;color:var(--mute)}
+details[open] > summary::after{content:"\2013"}
+.field{display:grid;grid-template-columns:1fr 4.5rem;grid-template-areas:"label num" "range range";gap:.15rem .6rem;align-items:center;padding:.4rem 0}
+.field label{grid-area:label;font-size:.94rem}
+.field label small{display:block;color:var(--mute)}
+.field input[type=number],.field select{grid-area:num;width:100%;font:inherit;font-variant-numeric:tabular-nums;padding:.28rem .35rem;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:0}
+.field input[type=range]{grid-area:range;width:100%;accent-color:var(--pollen);margin:0}
+.field.check,.field.sel{grid-template-columns:1fr auto;grid-template-areas:"label num"}
+.field.sel select{width:auto;min-width:7.5rem}
+.field.check input[type=checkbox]{grid-area:num;width:1.3rem;height:1.3rem;accent-color:var(--hive)}
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:0 1.1rem}
+@media (max-width:560px){.twocol{grid-template-columns:1fr}}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--pollen);outline-offset:2px}
+
+.brief{background:var(--panel);border-left:4px solid var(--flower);padding:.7rem .85rem;margin:.6rem 0}
+.brief ol{margin:.3rem 0 0;padding-left:1.15rem}
+.brief li{margin:.3rem 0}
+button.reset{font:inherit;padding:.4rem .8rem;background:transparent;color:var(--mute);border:1px solid var(--line);cursor:pointer;margin-top:1rem}
+ul.notes{padding-left:1.15rem;color:var(--mute)}
+ul.notes li{margin:.35rem 0}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>BIOBUZZ build call</h1>
+  <p class="mute">Do we put a nectar placer on the robot, or leave it off and shoot faster? A flower pays a fixed 13 points if nobody can top your nectar, roughly half that if they can, and nothing if your partner already covers it. So the answer depends on how many other teams build one. Enter that share and the tool averages the gain over every alliance you could be drawn into.</p>
+</header>
+
+<div class="bar" aria-live="polite"><b id="barV"></b><span id="barN"></span></div>
+
+<section class="call">
+  <div class="kicker">The call</div>
+  <div class="verdict" id="verdict"></div>
+  <div class="because" id="because"></div>
+  <div class="versus">
+    <div class="card" id="cardW"><div class="n" id="nW">0</div><div class="t">expected net points per match, with the mechanism</div></div>
+    <div class="vs">vs</div>
+    <div class="card" id="cardWO"><div class="n" id="nWO">0</div><div class="t">expected net points per match, without it</div></div>
+  </div>
+  <p class="mute" id="breakeven"><small></small></p>
+  <div class="eq" id="eq"></div>
+</section>
+
+<aside class="inputs">
+  <h2>Inputs</h2>
+  <details open><summary>Our robot</summary><div class="twocol" id="robot"></div></details>
+  <details open><summary>The other teams</summary><div class="twocol" id="field"></div></details>
+  <details><summary>Autonomous</summary><div class="twocol" id="auto"></div></details>
+  <details><summary>The hive</summary><div class="twocol" id="hive"></div></details>
+  <details><summary>Flowers</summary><div class="twocol" id="flow"></div></details>
+  <button class="reset" id="reset">Reset to defaults</button>
+</aside>
+
+<div class="results">
+  <h2>Every alliance you could draw</h2>
+  <div class="tw"><table class="cmp">
+    <thead><tr><th>Partner</th><th class="l">Opponents</th><th>Chance</th><th>With mech</th><th>Without</th><th>Gain</th></tr></thead>
+    <tbody id="scen"></tbody>
+  </table></div>
+  <p class="mute"><small>Chance of each combination at the share you entered (partner: <i>f</i>; opponents with 0, 1, 2 placers: (1&minus;<i>f</i>)&sup2;, 2<i>f</i>(1&minus;<i>f</i>), <i>f</i>&sup2;). Each cell is the best match plan for that alliance, because on match day you can see who has what. The verdict is the probability-weighted average.</small></p>
+
+  <h2>How the gain moves</h2>
+  <p><label for="chartX" class="mute"><small>Sweep </small></label>
+    <select id="chartX" class="chartsel">
+      <option value="f">share of teams with a placer</option>
+      <option value="mechSave">seconds saved without the mechanism</option>
+      <option value="ourCycle">our cycle time</option>
+      <option value="N">balls per tip</option>
+      <option value="ptCycle">partner cycle time</option>
+      <option value="oppPlace">opponent seconds per placement</option>
+    </select></p>
+  <div class="chartwrap"><canvas id="chart" aria-label="Net gain from building the mechanism against the swept input"></canvas></div>
+  <p class="mute"><small>Above zero the mechanism pays, below it the faster cycle pays. The thick line is the expected gain; the thin lines pin the partner to one case.</small></p>
+
+  <h2>Where the 150 seconds go</h2>
+  <div class="tl" id="tl"></div>
+  <p class="mute" id="tlNote"><small></small></p>
+
+  <h2>Best plan for each build</h2>
+  <p class="mute" id="planCase"><small></small></p>
+  <div class="tw"><table class="cmp">
+    <thead><tr><th>Build / plan</th><th>Tips</th><th>Hive</th><th>Flowers</th><th>They get</th><th>Net</th></tr></thead>
+    <tbody id="cmp"></tbody>
+  </table></div>
+  <p class="mute" id="rp"><small></small></p>
+  <p class="mute"><small>Net is our whole-match total minus the flower points the opponent ends up with. "They get" counts only flower points we caused or failed to prevent. Tips are expected values. Each build's plan is the best of: hive only, cap 1 to 4 flowers by us, the partner, or both, with or without draining the pollen first, or drain only.</small></p>
+
+  <h2>Read this to the drivers</h2>
+  <div class="brief" id="brief"></div>
+
+  <h2>What this assumes</h2>
+  <ul class="notes">
+    <li>Match is 30 s auto, 8 s transition, 120 s teleop (10.1). Nectar cannot enter a flower until the last 60 s (G410, major foul per nectar) and all remaining nectar unlocks at 60 s (G426), so every flower plan is a last-minute plan; only draining can happen earlier (G418).</li>
+    <li>Points from Table 10-2: tip 20, bottom nectar bonus 5, each element in an owned flower 2, park 5, leave 3. RP thresholds (Table 10-3): 4 and 7 tips for POLLINATOR, 16 leave+park points for SWARM.</li>
+    <li>Each flower starts with 4 pollen, but the bottom one sits below the middle ring and is outside the scoring volume (Figure 10-5), so an untouched flower holds 3 scoring pollen. One nectar on top makes it 5 + 2&times;4 = 13 points to that alliance.</li>
+    <li>Ownership goes to the top-most nectar, so the last placer wins; the bonus goes to the bottom-most, so the first placer wins. When both alliances can place, the model treats it as a race and gives us a share equal to our alliance's placement speed over the total. It does not model who runs out of nectar or clock first.</li>
+    <li>Opponents with a placer take every flower we leave alone, up to what their robots can reach in the window, and always try when they can. Draining 3 pollen out of a flower is legal for anyone with a floor-level intake and cuts what they can win there from 13 to 7. Drained pollen is not credited as fuel: after the first tip the floor is never the bottleneck.</li>
+    <li>Flower work is charged to the robot doing it, drive time included. While one robot is at a flower the other shoots alone; when both shoot, the crowding efficiency applies.</li>
+    <li>A ball is worth 20 &divide; balls-per-tip. Nectar spent on a flower is nectar not shot. The human player holds back the nectar for flowers in the alliance area until 1:00.</li>
+    <li>Garden points (1 each) and elements left in the cell (2 each) are the same for both builds and are left out.</li>
+    <li>Adoption tends to rise through the season. If your estimate sits near the break-even, plan for the higher number.</li>
+  </ul>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+(function(){
+'use strict';
+
+var DEFAULTS = {
+  ourCycle:12, ourAcc:80, ourPlace:8, mechSave:1, mechRel:90, accGain:0, canDrain:false,
+  f:30, ptCap:'unknown', ptCycle:14, ptAcc:70, ptPlace:10, oppCap:'unknown', oppPlace:10,
+  autoTips:1, autoLeave:2, autoPark:2, autoCarry:2,
+  N:6, shootEff:90, park:true, parkSec:6,
+  pollenIn:3, slots:3, loadSec:6, drainSec:4, switchSec:3,
+  chartX:'f'
+};
+var S = load();
+
+function load(){
+  try{
+    var raw = localStorage.getItem('biobuzz-buildcall-v3');
+    if(raw){ var o = JSON.parse(raw); if(o && typeof o === 'object') return Object.assign({}, DEFAULTS, o); }
+  }catch(e){}
+  return Object.assign({}, DEFAULTS);
+}
+function save(){ try{ localStorage.setItem('biobuzz-buildcall-v3', JSON.stringify(S)); }catch(e){} }
+function withS(over, fn){ var s=S; S=Object.assign({},S,over); try{ return fn(); } finally{ S=s; } }
+
+/* ---------------- model ---------------- */
+
+var WINDOW = 60, FLOWERS = 4;
+
+function ballValue(){ return 20/Math.max(1,S.N); }
+function rate(r){ return 4*r.acc/Math.max(1,r.cycle); }
+function robots(build, ptCap){
+  var w = build==='with';
+  return [
+    {name:'us', cycle: w ? S.ourCycle : Math.max(1,S.ourCycle-S.mechSave), acc: Math.min(100, S.ourAcc+(w?0:S.accGain))/100, cap:w, rel:S.mechRel/100, place:S.ourPlace},
+    {name:'partner', cycle:S.ptCycle, acc:S.ptAcc/100, cap:!!ptCap, rel:1, place:S.ptPlace}
+  ];
+}
+// the alliances we could be drawn into, with their probabilities
+function scenarios(){
+  var f=S.f/100;
+  var pt = S.ptCap==='yes'?[0,1] : S.ptCap==='no'?[1,0] : [1-f,f];
+  var op = S.oppCap==='0'?[1,0,0] : S.oppCap==='1'?[0,1,0] : S.oppCap==='2'?[0,0,1] : [(1-f)*(1-f), 2*f*(1-f), f*f];
+  var out=[];
+  for(var p=0;p<2;p++) for(var c=0;c<3;c++) if(pt[p]*op[c]>1e-9) out.push({ptCap:p===1, opp:c, prob:pt[p]*op[c]});
+  return out;
+}
+function windowBalls(r0,r1,a,b,eff){
+  var o=Math.min(a,b);
+  return eff*(r0+r1)*o + r0*Math.max(0,a-b) + r1*Math.max(0,b-a);
+}
+
+// build: 'with'|'without'. F: flowers we touch. who: 'us'|'pt'|'both'|'none' (none = drain only). drain: pull the pollen first. sc: scenario.
+function evaluate(build,F,who,drain,sc){
+  var R=robots(build,sc.ptCap), eff=S.shootEff/100, bv=ballValue(), i;
+  var caps = F>0 && who!=='none';
+  var share = !caps?[0,0] : who==='us'?[1,0] : who==='pt'?[0,1] : [.5,.5];
+  for(i=0;i<2;i++) if(share[i]>0 && !R[i].cap) return null;
+  if(drain && (!S.canDrain || S.pollenIn===0)) return null;
+
+  // ---- flowers: a race between the two alliances' placers ----
+  var pollen = drain ? 0 : S.pollenIn;           // scoring pollen left in a flower we touch
+  var slots  = drain ? S.slots+2 : S.slots;      // ponytail: ~2 more nectar fit once 3 pollen are out
+  var ourRate=0, rel=0;
+  for(i=0;i<2;i++) if(share[i]>0){ ourRate += R[i].rel/R[i].place; rel += share[i]*R[i].rel; }
+  var theirRate = sc.opp/Math.max(1,S.oppPlace);
+  var s = ourRate>0 ? ourRate/(ourRate+theirRate) : 0;          // our share of first and last placements
+  var oppMax = Math.min(FLOWERS, sc.opp*Math.floor((WINDOW-S.parkSec)/Math.max(1,S.oppPlace)));
+  var E = pollen + Math.min(slots,2);                              // elements in a contested flower
+  var fl=[];
+  for(i=0;i<FLOWERS;i++){
+    var touched=i<F, capped=touched&&caps, p=touched?pollen:S.pollenIn, open=5+2*(p+1);
+    fl.push({
+      them:  capped ? rel*(1-s)*(5+2*E) + (1-rel)*open : open,    // if they engage it; a jammed placer leaves it open
+      usEng: capped ? rel*s*(5+2*E) : 0,
+      usNot: capped ? rel*open : 0                                 // nobody tops us
+    });
+  }
+  fl.sort(function(a,b){return b.them-a.them;});                  // they go for the richest flowers first
+  var flowerUs=0, flowerThem=0;
+  fl.forEach(function(x,k){ if(k<oppMax){ flowerThem+=x.them; flowerUs+=x.usEng; } else flowerUs+=x.usNot; });
+
+  // ---- time, charged to whoever does the flower work ----
+  var parkCost=S.park?S.parkSec:0, early=[0,0], late=[0,0], work=[];
+  for(i=0;i<2;i++){
+    var n=share[i]*F;
+    var ew = (drain && i===0 && F>0) ? F*S.pollenIn*S.drainSec + S.switchSec : 0;   // draining is our job
+    var lw = n>0 ? n*R[i].place + S.loadSec*Math.ceil(n/4) + S.switchSec : 0;
+    early[i]=Math.max(0,WINDOW-ew); late[i]=Math.max(0,WINDOW-parkCost-lw);
+    work.push({early:Math.min(WINDOW,ew), late:Math.min(WINDOW-parkCost,lw)});
+  }
+  var r0=rate(R[0]), r1=rate(R[1]);
+  var balls = S.autoCarry + windowBalls(r0,r1,early[0],early[1],eff) + windowBalls(r0,r1,late[0],late[1],eff);
+  var tips = balls/Math.max(1,S.N);
+  var nectarSpent = caps?F:0;
+
+  var teleHive = 20*tips - nectarSpent*bv;
+  var autoPts = 20*S.autoTips + 3*S.autoLeave + 5*S.autoPark;
+  var parkPts = S.park?10:0;
+  var total = autoPts+teleHive+parkPts+flowerUs;
+  return {build:build,F:F,who:who,drain:drain,sc:sc,tips:tips+S.autoTips,teleHive:teleHive,autoPts:autoPts,parkPts:parkPts,
+    flowerUs:flowerUs,flowerThem:flowerThem,total:total,net:total-flowerThem,s:s,
+    work:work,shoot:[early[0]+late[0],early[1]+late[1]],parkCost:parkCost,R:R};
+}
+
+function hiveOnly(build,sc){ return evaluate(build,0,'none',false,sc); }
+function best(build,sc){
+  var top=hiveOnly(build,sc);
+  for(var F=1;F<=FLOWERS;F++) ['us','pt','both','none'].forEach(function(w){ [false,true].forEach(function(d){
+    if(w==='none' && !d) return;
+    if(w==='both' && F<2) return;
+    var r=evaluate(build,F,w,d,sc); if(r && r.net>top.net+0.01) top=r;
+  });});
+  return top;
+}
+function expected(build){ var e=0; scenarios().forEach(function(sc){ e+=sc.prob*best(build,sc).net; }); return e; }
+function gain(){ return expected('with')-expected('without'); }
+function likely(){ return scenarios().sort(function(a,b){return b.prob-a.prob;})[0]; }
+
+// smallest per-cycle saving that makes leaving the mechanism off pay
+function breakevenSave(){
+  var w=expected('with');
+  for(var s=0;s<=8;s+=0.25){ if(withS({mechSave:s},function(){return expected('without');}) >= w) return s; }
+  return null;
+}
+// gain against adoption, with partner and opponents both unknown
+function adoptionCurve(){
+  var xs=[],ys=[];
+  for(var x=0;x<=100;x+=5){ xs.push(x); ys.push(withS({f:x,ptCap:'unknown',oppCap:'unknown'},gain)); }
+  return {xs:xs,ys:ys};
+}
+function equilibriumText(){
+  var c=adoptionCurve(), cross=[], i;
+  for(i=1;i<c.ys.length;i++) if((c.ys[i-1]>0)!==(c.ys[i]>0)) cross.push({x:c.xs[i], up:c.ys[i]>0});
+  var here=' At your '+S.f+'% the expected gain is '+Math.round(withS({ptCap:'unknown',oppCap:'unknown'},gain))+'.';
+  if(!cross.length) return (c.ys[0]>0
+    ? '<b>Dominant strategy.</b> Building pays at every adoption level from 0% to 100%, so what other teams do only changes how much, not whether.'
+    : '<b>Never pays.</b> At no adoption level does the mechanism beat the faster cycle with these numbers.') + here;
+  if(cross.length===1 && !cross[0].up) return '<b>Stable mix.</b> Building pays while fewer than about '+cross[0].x+'% of teams have a placer. Above that your partner usually covers the flowers and the cycle time is worth more. Adoption rises through the season, so the break-even matters most for the events you care about.'+here;
+  if(cross.length===1 && cross[0].up) return '<b>Tipping point at about '+cross[0].x+'%.</b> Below it nobody should build. Above it every team must, because opponents with placers take 13 points a flower you cannot answer. Expect it to tip once a few strong teams show one.'+here;
+  return '<b>Two regimes.</b> The gain changes sign at '+cross.map(function(k){return k.x+'%';}).join(' and ')+'. Read the chart before deciding.'+here;
+}
+
+/* ---------------- fields ---------------- */
+function el(h){ var t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstElementChild; }
+
+function num(box, key, label, min, max, step, hint){
+  var id='f'+key;
+  var f = el('<div class="field"><label for="'+id+'">'+label+(hint?'<small>'+hint+'</small>':'')+'</label>'+
+    '<input type="number" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+S[key]+'" inputmode="decimal">'+
+    '<input type="range" min="'+min+'" max="'+max+'" step="'+step+'" value="'+S[key]+'" aria-label="'+label+'"></div>');
+  var n=f.querySelector('input[type=number]'), r=f.querySelector('input[type=range]');
+  function set(v){ v=Number(v); if(isNaN(v)) v=min; v=Math.min(max,Math.max(min,v)); S[key]=v; n.value=v; r.value=v; update(); }
+  n.addEventListener('input',function(e){set(e.target.value);});
+  r.addEventListener('input',function(e){set(e.target.value);});
+  box.appendChild(f);
+}
+function chk(box, key, label, hint){
+  var id='c'+key;
+  var f = el('<div class="field check"><label for="'+id+'">'+label+(hint?'<small>'+hint+'</small>':'')+'</label>'+
+    '<input type="checkbox" id="'+id+'"'+(S[key]?' checked':'')+'></div>');
+  f.querySelector('input').addEventListener('change',function(e){ S[key]=e.target.checked; update(); });
+  box.appendChild(f);
+}
+function sel(box, key, label, opts, hint){
+  var id='s'+key;
+  var f = el('<div class="field sel"><label for="'+id+'">'+label+(hint?'<small>'+hint+'</small>':'')+'</label><select id="'+id+'">'+
+    opts.map(function(o){ return '<option value="'+o[0]+'"'+(S[key]===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></div>');
+  f.querySelector('select').addEventListener('change',function(e){ S[key]=e.target.value; update(); });
+  box.appendChild(f);
+}
+
+function build(){
+  var rb=document.getElementById('robot'); rb.innerHTML='';
+  num(rb,'ourCycle','Seconds per 4-ball cycle, with the mechanism',4,40,1,'collect, drive, shoot');
+  num(rb,'ourAcc','Accuracy %',10,100,5);
+  num(rb,'mechSave','Seconds saved per cycle without it',0,6,0.25,'weight, complexity, packaging');
+  num(rb,'accGain','Accuracy gained by spending the build time on the shooter instead %',0,30,1,'the real cost of a mechanism is the weeks it takes');
+  num(rb,'ourPlace','Seconds to place one nectar, drive included',2,30,1,'the top ring is 21.5 in up');
+  num(rb,'mechRel','Chance the placer works in a given match %',20,100,5,'new mechanisms jam');
+  chk(rb,'canDrain','Our intake can pull pollen out of the flower bottom','3.5 in opening at floor level');
+
+  var fd=document.getElementById('field'); fd.innerHTML='';
+  num(fd,'f','Share of teams with a nectar placer %',0,100,5,'count robots in the pits or in reveal videos');
+  sel(fd,'ptCap','Our partner',[['unknown','unknown, use the share'],['yes','has a placer'],['no','has no placer']],'set this for a known match');
+  sel(fd,'oppCap','Opposing placers',[['unknown','unknown, use the share'],['0','none'],['1','one robot'],['2','both robots']]);
+  num(fd,'ptCycle','Partner seconds per 4-ball cycle',4,40,1,'ask them, or watch a practice match');
+  num(fd,'ptAcc','Partner accuracy %',10,100,5);
+  num(fd,'ptPlace','Partner seconds per placement',2,30,1);
+  num(fd,'oppPlace','Opponent seconds per placement',2,30,1,'a typical placer');
+
+  var au=document.getElementById('auto'); au.innerHTML='';
+  num(au,'autoTips','Tips we expect in auto',0,4,1,'20 points each');
+  num(au,'autoLeave','Robots that earn LEAVE',0,2,1,'3 points each');
+  num(au,'autoPark','Robots that park in auto',0,2,1,'5 points each');
+  num(au,'autoCarry','Balls left in the up cell after auto',0,10,1,'they carry into teleop');
+
+  var hv=document.getElementById('hive'); hv.innerHTML='';
+  num(hv,'N','Balls needed per tip',2,16,1,'measure this on a real hive');
+  num(hv,'shootEff','Both robots shooting at once: efficiency %',30,100,5,'100 = no crowding');
+  chk(hv,'park','Both robots park at the end','5 points each');
+  num(hv,'parkSec','Seconds each robot needs to park',0,20,1);
+
+  var fl=document.getElementById('flow'); fl.innerHTML='';
+  num(fl,'pollenIn','Pollen that score in an untouched flower',0,4,1,'4 are staged; the bottom one is below the middle ring');
+  num(fl,'slots','Nectar that fit on top of them',1,6,1,'about 3, verify on a real flower');
+  num(fl,'loadSec','Seconds to load nectar at the loading zone',0,20,1,'per trip, up to 4 per trip');
+  num(fl,'drainSec','Seconds to pull one pollen from the bottom',1,15,1);
+  num(fl,'switchSec','Seconds to get back to shooting afterwards',0,15,1);
+
+  document.getElementById('chartX').value=S.chartX;
+}
+
+/* ---------------- render ---------------- */
+var BUILD = {with:'With the mechanism', without:'Without it'};
+function planTxt(r){
+  if(r.F===0) return 'hive only';
+  var n=r.F+' flower'+(r.F===1?'':'s');
+  if(r.who==='none') return 'drain '+n+', cap none';
+  var who = r.who==='us'?'we cap':r.who==='pt'?'partner caps':'both cap';
+  return (r.drain?'drain, then ':'')+who+' '+n;
+}
+function scTxt(sc){ return (sc.ptCap?'partner has a placer':'partner has none')+', '+['no opposing placer','one opposing placer','two opposing placers'][sc.opp]; }
+function pct(p){ return p>=0.995?'100%':p<0.005?'<1%':Math.round(p*100)+'%'; }
+function rpTxt(r){
+  var sw=3*S.autoLeave+5*S.autoPark+(S.park?10:0);
+  return r.tips.toFixed(1)+' tips ('+(r.tips>=7?'both POLLINATOR RPs':r.tips>=4?'POLLINATOR 1 only':'no POLLINATOR RP')+'), leave+park '+sw+' ('+(sw>=16?'SWARM RP':'no SWARM RP')+')';
+}
+
+var chart;
+function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+var SWEEP = {
+  f:        {xs:function(){return span(0,100,5);},  title:'share of teams with a nectar placer (%)'},
+  mechSave: {xs:function(){return span(0,6,0.25);}, title:'seconds saved per 4-ball cycle without the mechanism'},
+  ourCycle: {xs:function(){return span(6,30,1);},   title:'our seconds per 4-ball cycle, with the mechanism'},
+  N:        {xs:function(){return span(2,16,1);},   title:'balls needed per tip'},
+  ptCycle:  {xs:function(){return span(6,30,1);},   title:'partner seconds per 4-ball cycle'},
+  oppPlace: {xs:function(){return span(4,30,1);},   title:'opponent seconds per placement'}
+};
+function span(a,b,s){ var o=[]; for(var x=a;x<=b+1e-9;x+=s) o.push(Math.round(x*100)/100); return o; }
+
+function drawChart(){
+  if(!window.Chart){ document.querySelector('.chartwrap').innerHTML='<p class="mute">Chart library did not load; the tables still work.</p>'; return; }
+  var mode=SWEEP[S.chartX]?S.chartX:'f', xs=SWEEP[mode].xs();
+  function series(pt){
+    return xs.map(function(x){ var o={ptCap:pt}; o[mode]=x; if(mode==='f') o.oppCap='unknown'; return Math.round(withS(o,gain)); });
+  }
+  var ink=cssv('--ink'), mute=cssv('--mute'), line=cssv('--line');
+  var ds=[
+    {label:'expected', data:series('unknown'), borderColor:cssv('--pollen'), backgroundColor:cssv('--pollen'), borderWidth:3, tension:.15, pointRadius:0},
+    {label:'partner has no placer', data:series('no'), borderColor:cssv('--hive'), backgroundColor:cssv('--hive'), borderWidth:1.5, tension:.15, pointRadius:0},
+    {label:'partner has one', data:series('yes'), borderColor:cssv('--flower'), backgroundColor:cssv('--flower'), borderWidth:1.5, tension:.15, pointRadius:0},
+    {label:'break-even', data:xs.map(function(){return 0;}), borderColor:mute, borderDash:[4,4], borderWidth:1, pointRadius:0}
+  ];
+  var opts={responsive:true,maintainAspectRatio:false,animation:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:ink,boxWidth:12,font:{family:'Instrument Sans'}}},
+      tooltip:{callbacks:{label:function(it){return it.dataset.label+': '+it.formattedValue;}}}},
+    scales:{x:{title:{display:true,text:SWEEP[mode].title,color:mute},ticks:{color:mute,maxTicksLimit:12},grid:{color:line}},
+            y:{title:{display:true,text:'net gain',color:mute},ticks:{color:mute},grid:{color:line}}}};
+  if(chart){ chart.data={labels:xs,datasets:ds}; chart.options=opts; chart.update(); }
+  else chart=new Chart(document.getElementById('chart'),{type:'line',data:{labels:xs,datasets:ds},options:opts});
+}
+
+function timeline(r){
+  var box=document.getElementById('tl'); box.innerHTML='';
+  var total=150;
+  ['Our robot','Partner'].forEach(function(name,i){
+    var w=r.work[i];
+    box.appendChild(el('<div class="lab">'+name+'</div>'));
+    var track=el('<div class="track"></div>');
+    function seg(cls,sec,txt){
+      if(sec<=0.4) return;
+      var d=document.createElement('div');
+      d.className='seg '+cls;
+      d.style.width=(sec/total*100)+'%';
+      d.textContent = sec>=16 ? txt : '';
+      d.title=txt+' ('+sec.toFixed(0)+' s)';
+      track.appendChild(d);
+    }
+    seg('sg-auto',30,'auto');
+    seg('sg-dead',8,'');
+    seg('sg-shoot',WINDOW-w.early,'shoot the hive');
+    seg('sg-flower',w.early,'drain');
+    seg('sg-shoot',WINDOW-r.parkCost-w.late,'shoot');
+    seg('sg-flower',w.late,'cap');
+    seg('sg-park',r.parkCost,'park');
+    box.appendChild(track);
+  });
+  box.appendChild(el('<div class="ticks"><span>match start</span><span>auto ends</span><span>flowers open</span><span>buzzer</span></div>'));
+  document.getElementById('tlNote').innerHTML='<small>'+BUILD[r.build]+', '+planTxt(r)+', '+scTxt(r.sc)+'. Shooting time: us '+r.shoot[0].toFixed(0)+' s, partner '+r.shoot[1].toFixed(0)+' s.</small>';
+}
+
+function update(){
+  save();
+  var EW=expected('with'), EWO=expected('without'), adv=EW-EWO, close=Math.abs(adv)<3;
+  var sc0=likely(), W=best('with',sc0), WO=best('without',sc0);
+  var top = adv>0 ? W : WO;
+  var advTxt=(adv>0?'+':'')+adv.toFixed(0);
+
+  var verdict = close ? 'Too close to call on points' : adv>0 ? 'Build the flower mechanism' : 'Skip it, shoot faster';
+  document.getElementById('verdict').textContent = verdict;
+  document.getElementById('barV').textContent = close ? 'Too close to call' : adv>0 ? 'Build it' : 'Skip it';
+  document.getElementById('barN').textContent = advTxt+' net pts / match at '+S.f+'%';
+
+  var rp='';
+  [7,4].forEach(function(t){ if(!rp && W.tips<t && WO.tips>=t) rp=' Watch the '+t+'-tip POLLINATOR RP: the most likely match drops from '+WO.tips.toFixed(1)+' to '+W.tips.toFixed(1)+' tips with the mechanism.'; });
+  var likelyTxt='Most likely case ('+scTxt(sc0)+', '+pct(sc0.prob)+'): ';
+  document.getElementById('because').textContent = (close
+    ? 'The two builds are within '+Math.abs(adv).toFixed(0)+' net points a match at '+S.f+'% adoption, inside the noise of these estimates. Decide on build time and reliability: a placer that jams costs you the cycle time for nothing. '+likelyTxt+planTxt(W)+' with it, '+planTxt(WO)+' without.'
+    : adv>0
+    ? 'Worth about '+adv.toFixed(0)+' net points a match, averaged over the alliances you could draw at '+S.f+'% adoption. '+likelyTxt+planTxt(W)+'. The best you could do without it there is '+planTxt(WO)+'.'
+    : 'Shooting faster is worth about '+(-adv).toFixed(0)+' net points a match more than the flowers, averaged over the alliances you could draw at '+S.f+'% adoption. '+likelyTxt+planTxt(WO)+'.') + rp;
+
+  document.getElementById('nW').textContent=EW.toFixed(0);
+  document.getElementById('nWO').textContent=EWO.toFixed(0);
+  document.getElementById('cardW').className='card'+(!close&&adv>0?' win':'');
+  document.getElementById('cardWO').className='card'+(!close&&adv<=0?' win':'');
+
+  var be=breakevenSave(), beTxt;
+  if(be===null) beTxt='Even 8 s saved per cycle would not beat the mechanism at this adoption rate.';
+  else if(be===0) beTxt='The mechanism never pays here: flowers are not worth the time even with no speed penalty.';
+  else beTxt='Leaving the mechanism off only pays once it saves about '+be+' s per 4-ball cycle. You estimate '+S.mechSave+' s.';
+  document.getElementById('breakeven').innerHTML='<small>'+beTxt+'</small>';
+  document.getElementById('eq').innerHTML=equilibriumText();
+
+  var sc=document.getElementById('scen'); sc.innerHTML='';
+  scenarios().sort(function(a,b){return b.prob-a.prob;}).forEach(function(x){
+    var w=best('with',x), wo=best('without',x), g=w.net-wo.net;
+    sc.appendChild(el('<tr class="'+(x.ptCap===sc0.ptCap&&x.opp===sc0.opp?'best':'')+'">'+
+      '<td>'+(x.ptCap?'placer':'none')+'</td>'+
+      '<td class="l">'+['none','one placer','two placers'][x.opp]+'</td>'+
+      '<td>'+pct(x.prob)+'</td>'+
+      '<td>'+Math.round(w.net)+'<span class="sublabel">'+planTxt(w)+'</span></td>'+
+      '<td>'+Math.round(wo.net)+'<span class="sublabel">'+planTxt(wo)+'</span></td>'+
+      '<td class="n '+(g>0?'good':'warn')+'">'+(g>0?'+':'')+Math.round(g)+'</td></tr>'));
+  });
+
+  timeline(top);
+
+  document.getElementById('planCase').innerHTML='<small>Most likely alliance: '+scTxt(sc0)+' ('+pct(sc0.prob)+'). Set the partner and opponent selectors to see a specific match.</small>';
+  var tb=document.getElementById('cmp'); tb.innerHTML='';
+  [W, hiveOnly('with',sc0), WO, hiveOnly('without',sc0)].forEach(function(r,i){
+    if(i%2===1 && r.net===[W,WO][(i-1)/2].net) return;
+    tb.appendChild(el('<tr class="'+(r===top?'best':'')+'">'+
+      '<td>'+BUILD[r.build]+'<span class="sublabel">'+planTxt(r)+'</span></td>'+
+      '<td class="n">'+r.tips.toFixed(1)+'</td>'+
+      '<td>'+Math.round(r.teleHive+r.autoPts+r.parkPts)+'</td>'+
+      '<td>'+Math.round(r.flowerUs)+'</td>'+
+      '<td class="warn">'+Math.round(r.flowerThem)+'</td>'+
+      '<td class="n">'+Math.round(r.net)+'</td></tr>'));
+  });
+  document.getElementById('rp').innerHTML='<small>Ranking points, most likely match. With: '+rpTxt(W)+'. Without: '+rpTxt(WO)+'.</small>';
+
+  // driver brief for the winning build's plan in the most likely alliance
+  var R=top.R, eff=S.shootEff/100;
+  var tipSec=(S.N/(eff*(rate(R[0])+rate(R[1])))).toFixed(0);
+  var capper = top.who==='us'?'We':top.who==='pt'?'Partner':'Both robots';
+  var contested = top.sc.opp>0, caps = top.F>0 && top.who!=='none';
+  var steps=[];
+  steps.push('Auto: '+S.autoLeave+' robot'+(S.autoLeave===1?'':'s')+' leave, '+S.autoPark+' park, aim for '+S.autoTips+' tip'+(S.autoTips===1?'':'s')+'.');
+  if(top.drain) steps.push('First minute of teleop: we pull 3 pollen out of '+top.F+' flower'+(top.F===1?'':'s')+(caps?'':'; that leaves the opponent only 7 points a flower there')+'. Everything else at the hive.');
+  else steps.push('First minute of teleop: nothing but the hive. Nectar cannot enter a flower yet.');
+  steps.push('Expect a tip about every '+tipSec+' s with both robots shooting.');
+  if(caps){
+    steps.push('Human player: keep '+top.F+' nectar in the alliance area until the field timer shows 1:00, then feed them at the loading zone. Nectar in a flower before 1:00 is a 20-point foul each.');
+    if(contested) steps.push('At 1:00: '+capper.toLowerCase()+' claim '+top.F+' flower'+(top.F===1?'':'s')+' fast for the 5-point bottom bonus, then hold one nectar back and re-top in the last 10 s. The last nectar in owns the flower. Spare pollen dropped on top of your nectar fills the flower so nothing fits above it.');
+    else steps.push('At 1:00: '+capper.toLowerCase()+' put one nectar in each of '+top.F+' flower'+(top.F===1?'':'s')+'. Nobody on the other side can top it, so no need to wait. The other robot stays on the hive.');
+    steps.push('Leave '+(S.parkSec+2)+' s to get back to the loading zone. Do not trade the park for a marginal flower.');
+  } else if(contested && !top.drain) steps.push('At 1:00: keep shooting. We cannot answer their flowers; outscore them at the hive.');
+  else steps.push('At 1:00: keep shooting. Dump all unlocked nectar into the cell, do not drive to a flower.');
+  if(S.park) steps.push('Both robots park. That is 10 points and it feeds the SWARM ranking point.');
+  document.getElementById('brief').innerHTML='<ol><li>'+steps.join('</li><li>')+'</li></ol>';
+
+  drawChart();
+}
+
+document.getElementById('chartX').addEventListener('change',function(e){ S.chartX=e.target.value; update(); });
+document.getElementById('reset').addEventListener('click',function(){ S=Object.assign({},DEFAULTS); build(); update(); });
+if(window.matchMedia){
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){ if(chart){ chart.destroy(); chart=null; } update(); });
+}
+
+// self-check: the flower arithmetic must match Table 10-2 in the cases you can do by hand
+(function(){
+  withS(Object.assign({},DEFAULTS,{mechRel:100}),function(){
+    var u=evaluate('with',4,'us',false,{ptCap:false,opp:0,prob:1});
+    console.assert(Math.abs(u.flowerUs-4*13)<1e-9 && u.flowerThem===0, 'uncontested: 4 flowers x 13, opponent 0', u);
+    var h=hiveOnly('without',{ptCap:false,opp:1,prob:1});
+    console.assert(h.flowerUs===0 && Math.abs(h.flowerThem-4*13)<1e-9, 'no placer vs one: they take 52', h);
+    var c=evaluate('with',4,'us',false,{ptCap:false,opp:1,prob:1});
+    console.assert(Math.abs(c.flowerUs+c.flowerThem-4*(5+2*5))<1e-9, 'contested: bonus and ownership split, nothing lost', c);
+  });
+  withS(Object.assign({},DEFAULTS,{mechRel:0}),function(){
+    var j=evaluate('with',4,'us',false,{ptCap:false,opp:1,prob:1});
+    console.assert(j.flowerUs===0 && Math.abs(j.flowerThem-4*13)<1e-9, 'jammed placer: they get all 52', j);
+  });
+})();
+
+build(); update();
+})();
+</script>
+</body>
+</html>
