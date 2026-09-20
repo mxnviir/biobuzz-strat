@@ -140,6 +140,7 @@ ul.notes li{margin:.35rem 0}
     <div class="card" id="cardWO"><div class="n" id="nWO">0</div><div class="t">expected net points per match, without it</div></div>
   </div>
   <p class="mute" id="breakeven"><small></small></p>
+  <p class="mute" id="oppHive"><small></small></p>
   <div class="eq" id="eq"></div>
 </section>
 
@@ -213,6 +214,7 @@ ul.notes li{margin:.35rem 0}
 var DEFAULTS = {
   ourCycle:12, ourAcc:80, ourPlace:8, mechSave:1, mechRel:90, accGain:0, canDrain:false,
   f:30, ptCap:'unknown', ptCycle:14, ptAcc:70, ptPlace:10, oppCap:'unknown', oppPlace:10,
+  oppAcc:70, oppCycle:14, oppN:6,
   autoTips:1, autoLeave:2, autoPark:2, autoCarry:2,
   N:6, shootEff:90, park:true, parkSec:6,
   pollenIn:3, slots:3, loadSec:6, drainSec:4, switchSec:3,
@@ -324,6 +326,13 @@ function expected(build){ var e=0; scenarios().forEach(function(sc){ e+=sc.prob*
 function gain(){ return expected('with')-expected('without'); }
 function likely(){ return scenarios().sort(function(a,b){return b.prob-a.prob;})[0]; }
 
+// their hive output alone, ignoring flowers — not part of the build/skip verdict, which stays a net-points call
+function oppHiveRef(){
+  var r=4*(S.oppAcc/100)/Math.max(1,S.oppCycle), eff=S.shootEff/100;
+  var tips=eff*2*r*150/Math.max(1,S.oppN);
+  return {tips:tips, pts:20*tips};
+}
+
 // smallest per-cycle saving that makes leaving the mechanism off pay
 function breakevenSave(){
   var w=expected('with');
@@ -395,6 +404,9 @@ function build(){
   num(fd,'ptAcc','Partner accuracy %',10,100,5);
   num(fd,'ptPlace','Partner seconds per placement',2,30,1);
   num(fd,'oppPlace','Opponent seconds per placement',2,30,1,'a typical placer');
+  num(fd,'oppAcc','Opponent accuracy %',10,100,5);
+  num(fd,'oppCycle','Opponent seconds to shoot 4 balls',4,40,1,'their cycle time at the hive');
+  num(fd,'oppN','Balls the opponents need per tip',2,16,1,'if their hive differs from ours');
 
   var au=document.getElementById('auto'); au.innerHTML='';
   num(au,'autoTips','Tips we expect in auto',0,4,1,'20 points each');
@@ -530,6 +542,8 @@ function update(){
   else if(be===0) beTxt='The mechanism never pays here: flowers are not worth the time even with no speed penalty.';
   else beTxt='Leaving the mechanism off only pays once it saves about '+be+' s per 4-ball cycle. You estimate '+S.mechSave+' s.';
   document.getElementById('breakeven').innerHTML='<small>'+beTxt+'</small>';
+  var oh=oppHiveRef();
+  document.getElementById('oppHive').innerHTML='<small>For reference: the opposing alliance at '+S.oppAcc+'% accuracy, '+S.oppCycle+' s per 4 balls, '+S.oppN+' balls a tip, could manage about '+oh.tips.toFixed(1)+' tips ('+Math.round(oh.pts)+' pts) at their own hive alone, ignoring flowers.</small>';
   document.getElementById('eq').innerHTML=equilibriumText();
 
   var sc=document.getElementById('scen'); sc.innerHTML='';
